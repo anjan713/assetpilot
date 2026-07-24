@@ -134,9 +134,53 @@ button {
   inset: 0;
 }
 
+/* Too narrow for the fan: it is laid out at its minimum width and panned
+   instead of squeezed. Vertical overflow stays hidden so only the horizontal
+   axis scrolls. */
+.atom-canvas.is-scrollable {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  cursor: grab;
+}
+
+.atom-canvas.is-scrollable.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.atom-canvas.is-scrollable::-webkit-scrollbar {
+  height: 10px;
+}
+
+.atom-canvas.is-scrollable::-webkit-scrollbar-track {
+  background: rgba(241, 237, 228, 0.04);
+}
+
+.atom-canvas.is-scrollable::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(242, 193, 78, 0.45);
+  background-clip: content-box;
+}
+
+.atom-canvas.is-scrollable::-webkit-scrollbar-thumb:hover {
+  background: rgba(242, 193, 78, 0.7);
+  background-clip: content-box;
+}
+
+/* Firefox has no ::-webkit-scrollbar equivalent. */
+@supports not selector(::-webkit-scrollbar) {
+  .atom-canvas.is-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(242, 193, 78, 0.45) rgba(241, 237, 228, 0.04);
+  }
+}
+
 .atom-svg {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
 }
 
 .atom {

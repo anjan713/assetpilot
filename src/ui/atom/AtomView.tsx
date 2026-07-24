@@ -5,6 +5,9 @@ import type { Account, AssetClass } from '../../engine/types'
 import { CLASS_COLORS, GOLD } from '../colors'
 import { fmtUsd } from '../format'
 import { SolarBackground } from './SolarBackground'
+import { useMediaQuery } from '../useMediaQuery'
+import { useDragScroll } from './useDragScroll'
+import { useScrollRangeIntoView } from './useScrollRangeIntoView'
 
 export type AtomStage = 'atom' | 'accounts' | 'categories'
 
@@ -67,6 +70,35 @@ function threadPathV(
 
 /** Below this container width the drill-down flows top-to-bottom instead. */
 const NARROW_BREAKPOINT = 700
+/**
+ * The fan's x positions are fractions of the layout width while the cards keep
+ * a fixed pixel width, so the columns close in on each other as the width drops
+ * and eventually overlap. Below this the fan is laid out at this width anyway
+ * and the canvas scrolls sideways, rather than being squeezed until the threads
+ * double back on themselves. Derived from the widest column pair: the account
+ * card ends at 31% + 250px and the leaves start at 56%, so 1160px leaves a ~40px
+ * gap between them.
+ */
+const MIN_FAN_WIDTH = 1160
+/** Where the leaf column starts, as a fraction of the layout width. */
+const LEAF_COLUMN_FRACTION = 0.56
+/** Detail panel width (480) + right margin (20) + breathing room (24). */
+const PANEL_CLEARANCE = 480 + 20 + 24
+/**
+ * The detail panel is an overlay, so the width it covers is unusable. Below
+ * this the fan scrolls instead, which beats the old approach of sliding the
+ * leaves left to dodge the panel — that could slide them onto the account
+ * cards, which is what made the threads double back.
+ */
+const MIN_FAN_WIDTH_WITH_PANEL = Math.ceil(
+  (LEAF_W + PANEL_CLEARANCE) / (1 - LEAF_COLUMN_FRACTION),
+)
+/**
+ * Matches the `max-width: 980px` rule in styles.css, below which the detail
+ * panel becomes a full-width bottom sheet. Only the side-panel form takes
+ * horizontal room, so only it needs clearing.
+ */
+const PANEL_BESIDE_QUERY = '(min-width: 981px)'
 const NARROW_MARGIN = 16
 const NARROW_CARD_GAP = 12
 const NARROW_ATOM_TOP = 96
@@ -105,11 +137,22 @@ export function AtomView({
   const isNarrow = w > 0 && w < NARROW_BREAKPOINT
   const midY = h * 0.48
 
-  const atomX = isNarrow || !isOpen ? w * 0.5 : w * 0.15
+  /* Only the open, horizontal fan needs the extra room — the closed atom and the
+     narrow stack both fit whatever they are given. */
+  const isFan = isOpen && !isNarrow
+  /* Only the side-panel form steals horizontal space; the bottom sheet does not. */
+  const isPanelBeside = useMediaQuery(PANEL_BESIDE_QUERY)
+  const isSidePanelOpen = isPanelOpen && isPanelBeside
+  const minFanWidth = isSidePanelOpen ? MIN_FAN_WIDTH_WITH_PANEL : MIN_FAN_WIDTH
+  const layoutW = isFan ? Math.max(w, minFanWidth) : w
+  const isScrollable = layoutW > w
+  useDragScroll(containerRef, isScrollable)
+
+  const atomX = isNarrow || !isOpen ? layoutW * 0.5 : layoutW * 0.15
   const atomY = isNarrow && isOpen ? NARROW_ATOM_TOP : isNarrow ? h * 0.42 : midY
 
-  const cardW = isNarrow ? w - NARROW_MARGIN * 2 : CARD_W
-  const cardX = isNarrow ? NARROW_MARGIN : w * 0.31
+  const cardW = isNarrow ? layoutW - NARROW_MARGIN * 2 : CARD_W
+  const cardX = isNarrow ? NARROW_MARGIN : layoutW * 0.31
   const narrowFanTop = atomY + NARROW_FAN_OFFSET
   const cardsTop = isNarrow
     ? narrowFanTop
@@ -126,18 +169,14 @@ export function AtomView({
   const cardY = (index: number) =>
     isBreadcrumbMode ? cardsTop : cardsTop + index * (CARD_H + cardGap)
 
-  /* Panel width (480) + right margin (20) + breathing room (24). */
-  const PANEL_CLEARANCE = 480 + 20 + 24
   /* Narrow: categories sit two-up in a staggered grid instead of full-width rows. */
   const NARROW_LEAF_GAP = 12
   const NARROW_LEAF_STAGGER = 24
   const leafW = isNarrow
-    ? (w - NARROW_MARGIN * 2 - NARROW_LEAF_GAP) / 2
+    ? (layoutW - NARROW_MARGIN * 2 - NARROW_LEAF_GAP) / 2
     : LEAF_W
   const leafH = isNarrow ? 78 : LEAF_H
-  const wideLeafX = isPanelOpen
-    ? Math.min(w * 0.56, w - PANEL_CLEARANCE - LEAF_W)
-    : w * 0.56
+  const wideLeafX = layoutW * LEAF_COLUMN_FRACTION
   const leavesTop = isNarrow
     ? narrowFanTop + CARD_H + 30
     : midY - (categories.length * LEAF_H + (categories.length - 1) * LEAF_GAP) / 2
@@ -156,12 +195,28 @@ export function AtomView({
     }
   }
 
+  /* Drilling down puts the new column off-screen once the canvas is panned, so
+     follow the selection instead of leaving the user to go and find it. The
+     leaves are the newly revealed level; before that it is the account cards. */
+  const focusFrom = stage === 'categories' ? wideLeafX : cardX
+  const focusTo =
+    stage === 'categories' ? wideLeafX + leafW : cardX + cardW
+  useScrollRangeIntoView(containerRef, {
+    from: focusFrom,
+    to: focusTo,
+    rightInset: isSidePanelOpen ? PANEL_CLEARANCE : 0,
+    isEnabled: isScrollable,
+  })
+
   const isReady = w > 0 && h > 0
 
   return (
-    <div ref={containerRef} className={`atom-canvas stage-${stage}`}>
+    <div
+      ref={containerRef}
+      className={`atom-canvas stage-${stage} ${isScrollable ? 'is-scrollable' : ''}`}
+    >
       {isReady && (
-        <svg className="atom-svg" width={w} height={h} aria-hidden="true">
+        <svg className="atom-svg" width={layoutW} height={h} aria-hidden="true">
           <defs>
             <radialGradient id="atom-core-gold" cx="42%" cy="38%" r="70%">
               <stop offset="0%" stopColor="#FFF3D6" />
@@ -191,7 +246,7 @@ export function AtomView({
             </filter>
           </defs>
 
-          <SolarBackground width={w} height={h} />
+          <SolarBackground width={layoutW} height={h} />
 
           {/* Level 1 threads: atom → account cards */}
           {isOpen &&
