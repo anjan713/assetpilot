@@ -6,7 +6,7 @@ editable target, and returns the exact buys and sells needed to reach it. Cash
 never moves between accounts: each account is rebalanced on its own, funded
 only by its own sells and its own cash, so no account's total ever changes.
 
-**Live app:** https://TODO-PASTE-VERCEL-URL, deployed on Vercel
+**Live app:** https://assetpilot-nv4u.vercel.app, deployed on Vercel
 (see [Deploy](#deploy-vercel)).
 
 Design docs: [PROBLEM.md](PROBLEM.md) · [PERSONA.md](PERSONA.md) ·
