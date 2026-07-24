@@ -1,5 +1,7 @@
-import { ASSET_CLASSES } from './types'
-import type { AssetClass } from './types'
+// `.js` extension required: this module is pulled into the Vercel serverless
+// bundle for api/targets.ts, which Node loads as ESM.
+import { ASSET_CLASSES } from './types.js'
+import type { AssetClass } from './types.js'
 
 const PERCENT_SUM = 100
 

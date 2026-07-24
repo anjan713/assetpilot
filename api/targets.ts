@@ -11,10 +11,12 @@
  * applyDollarGoals() converts it to an exact percentage against the household
  * total — so the number is always right regardless of the model's math.
  */
-import { applyDollarGoals } from '../src/engine/dollarTarget'
-import type { DollarGoal } from '../src/engine/dollarTarget'
-import { ASSET_CLASSES } from '../src/engine/types'
-import type { AssetClass } from '../src/engine/types'
+// NOTE: these use explicit `.js` extensions because Vercel transpiles this file
+// to ESM and Node's ESM loader will not resolve extensionless relative paths.
+import { applyDollarGoals } from '../src/engine/dollarTarget.js'
+import type { DollarGoal } from '../src/engine/dollarTarget.js'
+import { ASSET_CLASSES } from '../src/engine/types.js'
+import type { AssetClass } from '../src/engine/types.js'
 
 const MAX_GOAL_LENGTH = 300
 const MAX_CONTEXT_BYTES = 20_000
