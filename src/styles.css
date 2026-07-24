@@ -1583,11 +1583,15 @@ button {
 
 /* Goal bar — one line above the targets legend: write a goal, the AI
    suggests a whole-number target mix and a one-line why. */
+/* Centred with auto margins, not translateX(-50%): the shared `legend-in`
+   animation sets `transform` and (with fill-mode `both`) would overwrite a
+   translate-based centring once it finishes. */
 .goal-dock {
   position: absolute;
   bottom: 86px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
