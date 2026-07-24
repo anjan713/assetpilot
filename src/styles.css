@@ -102,6 +102,16 @@ button {
   opacity: 0.75;
 }
 
+/* Only above the legend's own breakpoint — below 700px the legend is hidden and
+   the footnote keeps the strip to itself. */
+@media (min-width: 700px) {
+  .stage-footnote.footnote-hidden {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 200ms ease;
+  }
+}
+
 .engine-error {
   position: absolute;
   top: 76px;
@@ -929,11 +939,18 @@ button {
 
 /* Targets legend — a horizontal strip under the top bar while the atom is
    open. No box: items float directly on the night sky. */
+/* Centred with auto margins rather than `left: 50%` + translateX(-50%): with
+   left at 50% the box's available width is only the gap between the midpoint
+   and the right edge, so it wrapped at half the screen width and never reached
+   its max-width. `inset-inline: 0` hands it the full stage to lay out in, and
+   `width: fit-content` keeps it hugging its content so the sky stays clickable. */
 .target-legend {
   position: absolute;
   bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -947,11 +964,11 @@ button {
 @keyframes legend-in {
   from {
     opacity: 0;
-    transform: translate(-50%, 6px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
   }
 }
 

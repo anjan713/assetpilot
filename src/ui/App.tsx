@@ -200,7 +200,9 @@ export function App() {
         />
       )}
 
-      <p className="stage-footnote">
+      {/* The targets legend occupies the same bottom strip, so the footnote
+          steps aside once the atom is open. */}
+      <p className={`stage-footnote${isAtomOpen ? ' footnote-hidden' : ''}`}>
         Every number is computed by tested, deterministic code from the broker
         CSV — nothing is estimated.
       </p>
