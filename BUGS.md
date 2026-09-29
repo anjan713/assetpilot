@@ -3,13 +3,13 @@
 Known defects in AssetPilot, newest first. Each entry says where it shows, what
 went wrong, why, and how the fix was checked.
 
-Status: **Open**, **Fixed (uncommitted)**, or **Fixed** with the commit.
+Status: **Open**, **Fixed in `202c894`**, or **Fixed** with the commit.
 
 ---
 
 ## B008 · Phones replayed the thread animation when the sheet closed
 
-- **Status**: Fixed (uncommitted)
+- **Status**: Fixed in `202c894`
 - **Where**: Phones, closing the transactions sheet, or deselecting an account.
 - **What happened**: The thread to the box you had selected drew itself in
   again, glowing head and all, as if it were new.
@@ -26,7 +26,7 @@ Status: **Open**, **Fixed (uncommitted)**, or **Fixed** with the commit.
 
 ## B007 · Phone sheet: scrolling inside it could scroll the page instead
 
-- **Status**: Fixed (uncommitted)
+- **Status**: Fixed in `202c894`
 - **Where**: Phones, the transactions bottom sheet.
 - **What happened**: Once the sheet's list reached its top or bottom, the
   scroll carried on into the page behind it. iPhones chain scrolls this way by
@@ -40,7 +40,7 @@ Status: **Open**, **Fixed (uncommitted)**, or **Fixed** with the commit.
 
 ## B006 · Phone sheet: the page behind it scrolled
 
-- **Status**: Fixed (uncommitted)
+- **Status**: Fixed in `202c894`
 - **Where**: Phones, a swipe anywhere outside the open transactions sheet.
 - **What happened**: The page underneath scrolled away while the sheet stayed
   on top.
@@ -57,7 +57,7 @@ Status: **Open**, **Fixed (uncommitted)**, or **Fixed** with the commit.
 
 ## B005 · Phone sheet: dragging the grab strip didn't close it
 
-- **Status**: Fixed (uncommitted)
+- **Status**: Fixed in `202c894`
 - **Where**: Phones, the thin strip at the top of the transactions sheet.
 - **What happened**: Dragging the strip down scrolled the page instead of
   closing the sheet. The strip was drawn on, with no drag handling behind it.
@@ -84,7 +84,7 @@ Status: **Open**, **Fixed (uncommitted)**, or **Fixed** with the commit.
 
 ## B003 · Phones highlighted every thread gold, not just the selection
 
-- **Status**: Fixed (uncommitted)
+- **Status**: Fixed in `202c894`
 - **Where**: Phones, after picking an account or an asset type.
 - **What happened**: The whole left trunk turned gold as soon as any account was
   picked, and so did the whole sub-trunk under it. The asset-type branches
@@ -102,7 +102,7 @@ Status: **Open**, **Fixed (uncommitted)**, or **Fixed** with the commit.
 
 ## B002 · Phones opened the transactions sheet as soon as an account was tapped
 
-- **Status**: Fixed (uncommitted)
+- **Status**: Fixed in `202c894`
 - **Where**: Phones, tapping an account card.
 - **What happened**: Picking an account also picked its first asset type, so
   the transactions sheet slid up at once and covered the categories you had
@@ -118,7 +118,7 @@ Status: **Open**, **Fixed (uncommitted)**, or **Fixed** with the commit.
 
 ## B001 · Phones hid the threads behind the account cards
 
-- **Status**: Fixed (uncommitted)
+- **Status**: Fixed in `202c894`
 - **Where**: Phones (screens under 700px wide), with the atom open.
 - **What happened**: Each thread ran from the atom, centred above the list, to
   the top-centre of its card. The cards are full width and stacked, so every
