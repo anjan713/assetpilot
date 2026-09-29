@@ -9,3 +9,6 @@ coverage/
 .DS_Store
 Design/*
 
+
+# Local submission artefacts (PDF exports) — not for the repo
+submission/
