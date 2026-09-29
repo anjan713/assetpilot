@@ -14,10 +14,17 @@ import { TargetLegend } from './TargetLegend'
 import { CashOrderDrawer } from './CashOrderDrawer'
 import { TradesDrawer } from './TradesDrawer'
 import { TransactionsPanel } from './TransactionsPanel'
+import { useMediaQuery } from './useMediaQuery'
 
 export type PercentInputs = Record<AssetClass, string>
 
 type Drawer = 'cash' | 'trades' | null
+
+/**
+ * Matches AtomView's phone spine. There the details open as a bottom sheet
+ * over the tree, so picking an account must not open one straight away.
+ */
+const PHONE_QUERY = '(max-width: 699px)'
 
 /** The first asset class this account actually holds (its first leaf). */
 function firstHeldClass(account: Account): AssetClass {
@@ -56,6 +63,7 @@ export function App() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [selectedClass, setSelectedClass] = useState<AssetClass | null>(null)
   const [drawer, setDrawer] = useState<Drawer>(null)
+  const isPhone = useMediaQuery(PHONE_QUERY)
   const [percentInputs, setPercentInputs] = useState<PercentInputs>(() =>
     toInputs(defaultTargets(accounts)),
   )
@@ -133,7 +141,7 @@ export function App() {
           } else {
             const account = accounts.find((a) => a.id === id)
             setSelectedClass(
-              account === undefined ? ASSET_CLASSES[0] : firstHeldClass(account),
+              isPhone ? null : account === undefined ? ASSET_CLASSES[0] : firstHeldClass(account),
             )
             setSelectedAccountId(id)
           }

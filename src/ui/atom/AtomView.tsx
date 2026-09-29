@@ -8,6 +8,8 @@ import { SolarBackground } from './SolarBackground'
 import { useMediaQuery } from '../useMediaQuery'
 import { useDragScroll } from './useDragScroll'
 import { useScrollRangeIntoView } from './useScrollRangeIntoView'
+import { branchPath, spineLayout, trunkPath, trunkUpTo } from './spineLayout'
+import type { Box, SpineLayout } from './spineLayout'
 
 export type AtomStage = 'atom' | 'accounts' | 'categories'
 
@@ -56,19 +58,15 @@ function threadPath(x1: number, y1: number, x2: number, y2: number): string {
   return `M ${x1} ${y1} C ${x1 + pull} ${y1}, ${x2 - pull} ${y2}, ${x2} ${y2}`
 }
 
-/** Vertical variant for narrow screens; `bow` arcs the curve sideways. */
-function threadPathV(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  bow: number,
-): string {
-  const pull = Math.max((y2 - y1) * 0.45, 30)
-  return `M ${x1} ${y1} C ${x1 + bow} ${y1 + pull}, ${x2 + bow} ${y2 - pull}, ${x2} ${y2}`
+/**
+ * Sets the path both ways: the attribute for Safari, and the CSS `d` property
+ * where supported so a spine thread glides with its card instead of jumping.
+ */
+function pathProps(d: string, extraStyle?: React.CSSProperties) {
+  return { d, style: { ...extraStyle, d: `path("${d}")` } as React.CSSProperties }
 }
 
-/** Below this container width the drill-down flows top-to-bottom instead. */
+/** Below this container width the drill-down becomes the phone spine. */
 const NARROW_BREAKPOINT = 700
 /**
  * The fan's x positions are fractions of the layout width while the cards keep
@@ -99,11 +97,6 @@ const MIN_FAN_WIDTH_WITH_PANEL = Math.ceil(
  * horizontal room, so only it needs clearing.
  */
 const PANEL_BESIDE_QUERY = '(min-width: 981px)'
-const NARROW_MARGIN = 16
-const NARROW_CARD_GAP = 12
-const NARROW_ATOM_TOP = 96
-/** Vertical space between the atom's center and the first card. */
-const NARROW_FAN_OFFSET = 132
 
 function useContainerSize(): [React.RefObject<HTMLDivElement>, { w: number; h: number }] {
   const ref = useRef<HTMLDivElement>(null)
@@ -138,7 +131,7 @@ export function AtomView({
   const midY = h * 0.48
 
   /* Only the open, horizontal fan needs the extra room — the closed atom and the
-     narrow stack both fit whatever they are given. */
+     phone spine both fit whatever they are given. */
   const isFan = isOpen && !isNarrow
   /* Only the side-panel form steals horizontal space; the bottom sheet does not. */
   const isPanelBeside = useMediaQuery(PANEL_BESIDE_QUERY)
@@ -148,59 +141,43 @@ export function AtomView({
   const isScrollable = layoutW > w
   useDragScroll(containerRef, isScrollable)
 
-  const atomX = isNarrow || !isOpen ? layoutW * 0.5 : layoutW * 0.15
-  const atomY = isNarrow && isOpen ? NARROW_ATOM_TOP : isNarrow ? h * 0.42 : midY
-
-  const cardW = isNarrow ? layoutW - NARROW_MARGIN * 2 : CARD_W
-  const cardX = isNarrow ? NARROW_MARGIN : layoutW * 0.31
-  const narrowFanTop = atomY + NARROW_FAN_OFFSET
-  const cardsTop = isNarrow
-    ? narrowFanTop
-    : midY - (accounts.length * CARD_H + (accounts.length - 1) * CARD_GAP) / 2
-  const cardGap = isNarrow ? NARROW_CARD_GAP : CARD_GAP
-
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null
   const categories = selectedAccount === null ? [] : categoriesOf(selectedAccount)
   const selectedIndex = accounts.findIndex((a) => a.id === selectedAccountId)
 
-  /* Narrow + categories: only the selected account stays, pinned as a breadcrumb. */
-  const isBreadcrumbMode = isNarrow && stage === 'categories'
-  const isAccountVisible = (id: string) => !isBreadcrumbMode || id === selectedAccountId
-  const cardY = (index: number) =>
-    isBreadcrumbMode ? cardsTop : cardsTop + index * (CARD_H + cardGap)
+  const spine =
+    isNarrow && isOpen
+      ? spineLayout({
+          width: w,
+          accountCount: accounts.length,
+          selectedIndex: stage === 'categories' && selectedIndex >= 0 ? selectedIndex : null,
+          leafCount: stage === 'categories' ? categories.length : 0,
+        })
+      : null
 
-  /* Narrow: categories sit two-up in a staggered grid instead of full-width rows. */
-  const NARROW_LEAF_GAP = 12
-  const NARROW_LEAF_STAGGER = 24
-  const leafW = isNarrow
-    ? (layoutW - NARROW_MARGIN * 2 - NARROW_LEAF_GAP) / 2
-    : LEAF_W
-  const leafH = isNarrow ? 78 : LEAF_H
+  const atomX = spine !== null ? spine.atom.x : !isOpen || isNarrow ? layoutW * 0.5 : layoutW * 0.15
+  const atomY = spine !== null ? spine.atom.y : isNarrow ? h * 0.42 : midY
+  const atomScale = spine !== null ? spine.atom.scale : 1
+
+  const cardX = layoutW * 0.31
+  const cardsTop = midY - (accounts.length * CARD_H + (accounts.length - 1) * CARD_GAP) / 2
+  const cardBox = (index: number): Box =>
+    spine !== null
+      ? spine.cards[index]
+      : { x: cardX, y: cardsTop + index * (CARD_H + CARD_GAP), w: CARD_W, h: CARD_H }
+
   const wideLeafX = layoutW * LEAF_COLUMN_FRACTION
-  const leavesTop = isNarrow
-    ? narrowFanTop + CARD_H + 30
-    : midY - (categories.length * LEAF_H + (categories.length - 1) * LEAF_GAP) / 2
-  const leafPos = (index: number): { x: number; y: number } => {
-    if (!isNarrow) {
-      return { x: wideLeafX, y: leavesTop + index * (LEAF_H + LEAF_GAP) }
-    }
-    const column = index % 2
-    const row = Math.floor(index / 2)
-    return {
-      x: NARROW_MARGIN + column * (leafW + NARROW_LEAF_GAP),
-      y:
-        leavesTop +
-        row * (leafH + 18) +
-        (column === 1 ? NARROW_LEAF_STAGGER : 0),
-    }
-  }
+  const leavesTop = midY - (categories.length * LEAF_H + (categories.length - 1) * LEAF_GAP) / 2
+  const leafBox = (index: number): Box =>
+    spine !== null
+      ? spine.leaves[index]
+      : { x: wideLeafX, y: leavesTop + index * (LEAF_H + LEAF_GAP), w: LEAF_W, h: LEAF_H }
 
   /* Drilling down puts the new column off-screen once the canvas is panned, so
      follow the selection instead of leaving the user to go and find it. The
      leaves are the newly revealed level; before that it is the account cards. */
   const focusFrom = stage === 'categories' ? wideLeafX : cardX
-  const focusTo =
-    stage === 'categories' ? wideLeafX + leafW : cardX + cardW
+  const focusTo = stage === 'categories' ? wideLeafX + LEAF_W : cardX + CARD_W
   useScrollRangeIntoView(containerRef, {
     from: focusFrom,
     to: focusTo,
@@ -214,6 +191,7 @@ export function AtomView({
     <div
       ref={containerRef}
       className={`atom-canvas stage-${stage} ${isScrollable ? 'is-scrollable' : ''}`}
+      style={{ height: spine?.height }}
     >
       {isReady && (
         <svg className="atom-svg" width={layoutW} height={h} aria-hidden="true">
@@ -248,92 +226,60 @@ export function AtomView({
 
           <SolarBackground width={layoutW} height={h} />
 
-          {/* Level 1 threads: atom → account cards */}
-          {isOpen &&
-            accounts.map((account, index) => {
-              if (!isAccountVisible(account.id)) return null
-              const d = isNarrow
-                ? threadPathV(
-                    atomX,
-                    atomY + ATOM_CORE_R + 12,
-                    cardX + cardW / 2,
-                    cardY(index),
-                    -(28 + index * 12),
+          {spine !== null ? (
+            <SpineThreads
+              spine={spine}
+              accounts={accounts}
+              categories={categories}
+              selectedAccountId={selectedAccountId}
+              selectedClass={selectedClass}
+            />
+          ) : (
+            <>
+              {/* Level 1 threads: atom → account cards */}
+              {isOpen &&
+                accounts.map((account, index) => {
+                  const card = cardBox(index)
+                  const d = threadPath(atomX + ATOM_CORE_R + 10, atomY, card.x, card.y + card.h / 2)
+                  const isActive = account.id === selectedAccountId
+                  return (
+                    <Thread
+                      key={account.id}
+                      d={d}
+                      index={index}
+                      stroke={isActive ? GOLD : 'rgba(241, 237, 228, 0.28)'}
+                      isActive={isActive}
+                      glow={GOLD}
+                    />
                   )
-                : threadPath(
-                    atomX + ATOM_CORE_R + 10,
-                    atomY,
-                    cardX,
-                    cardY(index) + CARD_H / 2,
-                  )
-              const isActive = account.id === selectedAccountId
-              return (
-                <g key={account.id} style={{ '--i': index } as React.CSSProperties}>
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={isActive ? GOLD : 'rgba(241, 237, 228, 0.28)'}
-                    strokeWidth={isActive ? 1.6 : 1}
-                    className="thread thread-draw"
-                  />
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={GOLD}
-                    filter="url(#comet-glow)"
-                    className="thread-glowhead"
-                  />
-                </g>
-              )
-            })}
+                })}
 
-          {/* Level 2 threads: selected account card → category leaves */}
-          {stage === 'categories' &&
-            selectedIndex >= 0 &&
-            categories.map((category, index) => {
-              const pos = leafPos(index)
-              const d = isNarrow
-                ? threadPathV(
-                    cardX + cardW / 2,
-                    cardY(selectedIndex) + CARD_H,
-                    pos.x + leafW / 2,
-                    pos.y,
-                    (index % 2 === 0 ? -1 : 1) * (22 + index * 6),
+              {/* Level 2 threads: selected account card → category leaves */}
+              {stage === 'categories' &&
+                selectedIndex >= 0 &&
+                categories.map((category, index) => {
+                  const card = cardBox(selectedIndex)
+                  const leaf = leafBox(index)
+                  const d = threadPath(card.x + card.w, card.y + card.h / 2, leaf.x, leaf.y + leaf.h / 2)
+                  const isActive = category.assetClass === selectedClass
+                  return (
+                    <Thread
+                      key={`${selectedAccountId}-${category.assetClass}`}
+                      d={d}
+                      index={index}
+                      stroke={isActive ? GOLD : 'rgba(242, 193, 78, 0.35)'}
+                      isActive={isActive}
+                      glow={CLASS_COLORS[category.assetClass]}
+                    />
                   )
-                : threadPath(
-                    cardX + CARD_W,
-                    cardY(selectedIndex) + CARD_H / 2,
-                    pos.x,
-                    pos.y + LEAF_H / 2,
-                  )
-              const isActive = category.assetClass === selectedClass
-              return (
-                <g
-                  key={`${selectedAccountId}-${category.assetClass}`}
-                  style={{ '--i': index } as React.CSSProperties}
-                >
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={isActive ? GOLD : 'rgba(242, 193, 78, 0.35)'}
-                    strokeWidth={isActive ? 1.6 : 1}
-                    className="thread thread-draw"
-                  />
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke={CLASS_COLORS[category.assetClass]}
-                    filter="url(#comet-glow)"
-                    className="thread-glowhead"
-                  />
-                </g>
-              )
-            })}
+                })}
+            </>
+          )}
 
           {/* The household atom */}
           <g
             className="atom"
-            style={{ transform: `translate(${atomX}px, ${atomY}px)` }}
+            style={{ transform: `translate(${atomX}px, ${atomY}px) scale(${atomScale})` }}
           >
             <circle r={ATOM_CORE_R * 3.2} fill="url(#atom-halo)" className="sun-breathe" />
             <circle
@@ -366,7 +312,7 @@ export function AtomView({
       {isReady && (
         <button
           type="button"
-          className={`atom-button ${isOpen ? 'is-open' : ''}`}
+          className={`atom-button ${isOpen ? 'is-open' : ''} ${spine !== null ? 'is-beside' : ''}`}
           style={{ left: atomX, top: atomY }}
           onClick={onAtomToggle}
           aria-expanded={isOpen}
@@ -382,7 +328,7 @@ export function AtomView({
       {isReady &&
         isOpen &&
         accounts.map((account, index) => {
-          if (!isAccountVisible(account.id)) return null
+          const card = cardBox(index)
           const isActive = account.id === selectedAccountId
           return (
             <button
@@ -391,11 +337,11 @@ export function AtomView({
               className={`glass-card account-card ${isActive ? 'is-gold' : ''}`}
               style={
                 {
-                  left: cardX,
-                  top: cardY(index),
-                  width: cardW,
-                  height: CARD_H,
-                  '--i': isBreadcrumbMode ? 0 : index,
+                  left: card.x,
+                  top: card.y,
+                  width: card.w,
+                  height: card.h,
+                  '--i': index,
                 } as React.CSSProperties
               }
               onClick={() => onSelectAccount(account.id)}
@@ -416,18 +362,18 @@ export function AtomView({
         stage === 'categories' &&
         categories.map((category, index) => {
           const isActive = category.assetClass === selectedClass
-          const pos = leafPos(index)
+          const leaf = leafBox(index)
           return (
             <button
               key={`${selectedAccountId}-${category.assetClass}`}
               type="button"
-              className={`glass-card leaf-card ${isNarrow ? 'leaf-narrow' : ''} ${isActive ? 'is-gold' : ''}`}
+              className={`glass-card leaf-card ${isActive ? 'is-gold' : ''}`}
               style={
                 {
-                  left: pos.x,
-                  top: pos.y,
-                  width: leafW,
-                  height: leafH,
+                  left: leaf.x,
+                  top: leaf.y,
+                  width: leaf.w,
+                  height: leaf.h,
                   '--i': index,
                 } as React.CSSProperties
               }
@@ -450,5 +396,146 @@ export function AtomView({
           )
         })}
     </div>
+  )
+}
+
+interface ThreadProps {
+  d: string
+  index: number
+  stroke: string
+  isActive: boolean
+  glow: string
+  /** Spine threads animate their shape; the wide fan keeps plain attributes. */
+  isGliding?: boolean
+}
+
+/** One thread plus the bright head that rides it while it draws. */
+function Thread({ d, index, stroke, isActive, glow, isGliding = false }: ThreadProps) {
+  const shape = isGliding ? pathProps(d) : { d }
+  return (
+    <g style={{ '--i': index } as React.CSSProperties}>
+      <path
+        {...shape}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={isActive ? 1.6 : 1}
+        className={`thread thread-draw ${isGliding ? 'thread-glide' : ''}`}
+      />
+      <path
+        {...shape}
+        fill="none"
+        stroke={glow}
+        filter="url(#comet-glow)"
+        className={`thread-glowhead ${isGliding ? 'thread-glide' : ''}`}
+      />
+    </g>
+  )
+}
+
+interface SpineThreadsProps {
+  spine: SpineLayout
+  accounts: readonly Account[]
+  categories: readonly CategoryEntry[]
+  selectedAccountId: string | null
+  selectedClass: AssetClass | null
+}
+
+const FAINT_LEVEL_1 = 'rgba(241, 237, 228, 0.28)'
+const FAINT_LEVEL_2 = 'rgba(242, 193, 78, 0.35)'
+
+/**
+ * Phone threads: a trunk in the left gutter with a branch into each card. Like
+ * the desktop fan, every thread is faint except the path to the selection,
+ * which is drawn gold on top and stops at the selected card. The faint threads
+ * stay mounted under the gold ones, so deselecting never replays their draw-in.
+ */
+function SpineThreads({ spine, accounts, categories, selectedAccountId, selectedClass }: SpineThreadsProps) {
+  const selectedIndex = accounts.findIndex((a) => a.id === selectedAccountId)
+  const selectedCard = selectedIndex >= 0 ? spine.cards[selectedIndex] : undefined
+  const subTrunk = spine.subTrunk
+  const leafIndex = categories.findIndex((c) => c.assetClass === selectedClass)
+  const selectedLeaf = leafIndex >= 0 ? spine.leaves[leafIndex] : undefined
+  return (
+    <>
+      <Thread d={trunkPath(spine.trunk)} index={0} stroke={FAINT_LEVEL_1} isActive={false} glow={GOLD} isGliding />
+      {accounts.map((account, index) => (
+        <Thread
+          key={account.id}
+          d={branchPath(spine.trunk.x, spine.cards[index])}
+          index={index + 1}
+          stroke={FAINT_LEVEL_1}
+          isActive={false}
+          glow={GOLD}
+          isGliding
+        />
+      ))}
+      {subTrunk !== null && (
+        <Thread
+          key={`${selectedAccountId}-trunk`}
+          d={trunkPath(subTrunk)}
+          index={0}
+          stroke={FAINT_LEVEL_2}
+          isActive={false}
+          glow={GOLD}
+          isGliding
+        />
+      )}
+      {subTrunk !== null &&
+        categories.map((category, index) => (
+          <Thread
+            key={`${selectedAccountId}-${category.assetClass}`}
+            d={branchPath(subTrunk.x, spine.leaves[index])}
+            index={index + 1}
+            stroke={FAINT_LEVEL_2}
+            isActive={false}
+            glow={CLASS_COLORS[category.assetClass]}
+            isGliding
+          />
+        ))}
+      {selectedCard !== undefined && (
+        <>
+          <Thread
+            key={`${selectedAccountId}-path`}
+            d={trunkPath(trunkUpTo(spine.trunk, selectedCard))}
+            index={0}
+            stroke={GOLD}
+            isActive
+            glow={GOLD}
+            isGliding
+          />
+          <Thread
+            key={`${selectedAccountId}-active`}
+            d={branchPath(spine.trunk.x, selectedCard)}
+            index={1}
+            stroke={GOLD}
+            isActive
+            glow={GOLD}
+            isGliding
+          />
+        </>
+      )}
+      {subTrunk !== null && selectedLeaf !== undefined && (
+        <>
+          <Thread
+            key={`${selectedAccountId}-${selectedClass}-path`}
+            d={trunkPath(trunkUpTo(subTrunk, selectedLeaf))}
+            index={0}
+            stroke={GOLD}
+            isActive
+            glow={GOLD}
+            isGliding
+          />
+          <Thread
+            key={`${selectedAccountId}-${selectedClass}-active`}
+            d={branchPath(subTrunk.x, selectedLeaf)}
+            index={1}
+            stroke={GOLD}
+            isActive
+            glow={CLASS_COLORS[categories[leafIndex].assetClass]}
+            isGliding
+          />
+        </>
+      )}
+    </>
   )
 }

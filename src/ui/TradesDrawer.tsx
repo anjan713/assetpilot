@@ -180,10 +180,14 @@ function AccountPanel({ plan }: { plan: AccountPlan }) {
               <>
                 <p className="fund-journey">
                   <span>{fmtUsd(plan.cashBefore)}</span>
-                  <span className="journey-arrow" aria-hidden="true">→</span>
-                  <span className={`trade-chip ${cashChipClass}`}>{cashChipText}</span>
-                  <span className="journey-arrow" aria-hidden="true">→</span>
-                  <span className="journey-after">{fmtUsd(plan.cashTarget)}</span>
+                  <span className="journey-step">
+                    <span className="journey-arrow" aria-hidden="true">→</span>
+                    <span className={`trade-chip ${cashChipClass}`}>{cashChipText}</span>
+                  </span>
+                  <span className="journey-step">
+                    <span className="journey-arrow" aria-hidden="true">→</span>
+                    <span className="journey-after">{fmtUsd(plan.cashTarget)}</span>
+                  </span>
                 </p>
                 <p className="fund-shares">{cashSignedPct} of the account</p>
               </>

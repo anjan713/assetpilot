@@ -302,6 +302,23 @@ button {
   z-index: 5;
 }
 
+/* Phone spine: the shrunken atom sits top-left with its label beside it. The
+   button still covers the atom so the atom stays tappable. */
+.atom-button.is-beside {
+  width: 260px;
+  height: 64px;
+  transform: translate(-32px, -50%);
+  align-items: flex-start;
+  justify-content: center;
+  padding-left: 76px;
+}
+
+/* Spine threads glide with their cards (same timing as .glass-card) where the
+   browser can animate `d`; elsewhere they jump to the new shape. */
+.thread-glide {
+  transition: d 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
 /* The atom's label reads as a caption under the planet, never on it. */
 .atom-title {
   font-family: var(--font-display);
@@ -430,20 +447,6 @@ button {
   font-size: 12.5px;
 }
 
-/* Compact two-up leaf on narrow screens: value wraps to its own line. */
-.leaf-card.leaf-narrow {
-  flex-wrap: wrap;
-  align-content: center;
-  row-gap: 2px;
-  padding: 10px 12px;
-}
-
-.leaf-card.leaf-narrow .leaf-value {
-  margin-left: 0;
-  width: 100%;
-  font-size: 13px;
-}
-
 /* ==========================================================================
    Top bar
    ========================================================================== */
@@ -511,6 +514,7 @@ button {
   -webkit-backdrop-filter: blur(12px);
   font-weight: 500;
   font-size: 13.5px;
+  white-space: nowrap;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
@@ -1078,10 +1082,21 @@ button {
   white-space: nowrap;
 }
 
-/* Narrow screens: the canvas is already dense — targets stay in the drawer */
+/* Narrow screens: the legend joins the page flow under the canvas instead of
+   floating over the stack of cards. */
 @media (max-width: 699px) {
   .target-legend {
-    display: none;
+    position: relative;
+    bottom: auto;
+    width: auto;
+    max-width: none;
+    margin: 0 16px 20px;
+    gap: 10px 18px;
+  }
+
+  .legend-title {
+    flex-basis: 100%;
+    text-align: center;
   }
 }
 
@@ -1339,6 +1354,15 @@ button {
   font-weight: 600;
 }
 
+/* An arrow and the value it points at wrap as one unit, so a narrow row never
+   ends on a dangling arrow. */
+.journey-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
 @media (max-width: 980px) {
   .plan-columns {
     grid-template-columns: 1fr;
@@ -1489,6 +1513,15 @@ button {
    ========================================================================== */
 
 @media (max-width: 980px) {
+  /* The page scrolls here, so the body grows with it; pinned at 100% its
+     background stopped one screen down and left a seam. */
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+
   body {
     overflow: auto;
   }
@@ -1500,10 +1533,18 @@ button {
     flex-direction: column;
   }
 
+  /* The header joins the column flow so, however it wraps, it never covers
+     the canvas. `order` lifts it above the canvas, which comes first in the DOM. */
+  .topbar {
+    position: relative;
+    order: -1;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
   .atom-canvas {
     position: relative;
     height: 500px;
-    margin-top: 56px;
   }
 
   /* Taller canvases when levels fan downward. */
@@ -1530,16 +1571,41 @@ button {
     box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.7);
     animation: sheet-up 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
     z-index: 50;
+    /* Scrolling past the sheet's top or bottom must not move the page. */
+    overscroll-behavior: contain;
   }
 
-  .detail-panel::before {
+  /* The header is the drag zone: it spans the sheet's full width and top
+     padding, so a thumb anywhere along the top strip can pull it down. */
+  .detail-head {
+    position: relative;
+    margin: -20px -20px 16px;
+    padding: 28px 20px 0;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .detail-head::before {
     content: '';
-    display: block;
+    position: absolute;
+    top: 10px;
+    left: 50%;
     width: 44px;
     height: 4px;
-    margin: 0 auto 12px;
+    margin-left: -22px;
     border-radius: 999px;
     background: rgba(241, 237, 228, 0.2);
+  }
+
+  /* Dims and blocks the page behind the sheet; tapping it closes the sheet. */
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: rgba(0, 0, 0, 0.45);
+    touch-action: none;
+    opacity: 0;
+    animation: fade-in 0.25s ease both;
   }
 
   .dock {
@@ -1564,6 +1630,86 @@ button {
 
   .csv-stamp {
     display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .topbar {
+    padding: 12px 16px;
+  }
+
+  .brand-name {
+    font-size: 17px;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .pill-button {
+    gap: 6px;
+    padding: 7px 12px;
+    font-size: 12.5px;
+  }
+}
+
+/* Phone trade list: each trade becomes a two-line card, so the amount is
+   never pushed off-screen behind a sideways scroll.
+     SELL  FNILX              $11,590.22
+           428.791 sh @ $27.03            */
+@media (max-width: 560px) {
+  .trades-table thead {
+    display: none;
+  }
+
+  .trades-table tr {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: 10px;
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(241, 237, 228, 0.05);
+  }
+
+  .trades-table tr:last-child {
+    border-bottom: none;
+  }
+
+  .trades-table td {
+    padding: 0;
+    border-bottom: none;
+  }
+
+  .trades-table td:nth-child(3),
+  .trades-table td:nth-child(4) {
+    grid-row: 2;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .trades-table td:nth-child(3) {
+    grid-column: 2;
+  }
+
+  .trades-table td:nth-child(3)::after {
+    content: ' sh';
+  }
+
+  .trades-table td:nth-child(4) {
+    grid-column: 3;
+    text-align: right;
+  }
+
+  .trades-table td:nth-child(4)::before {
+    content: '@ ';
+  }
+
+  .trades-table td:nth-child(5) {
+    grid-column: 3;
+    grid-row: 1;
+    font-weight: 600;
   }
 }
 
@@ -1595,7 +1741,8 @@ button {
 
   .atom,
   .atom-button,
-  .glass-card {
+  .glass-card,
+  .thread-glide {
     transition: none;
   }
 }
@@ -1708,6 +1855,9 @@ button {
 
 @media (max-width: 699px) {
   .goal-dock {
-    display: none;
+    position: relative;
+    bottom: auto;
+    width: auto;
+    margin: 0 16px 16px;
   }
 }

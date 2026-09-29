@@ -1,9 +1,15 @@
+import { useRef } from 'react'
 import { classOf } from '../engine/mapping'
 import { CLASS_LABELS } from '../engine/types'
 import type { Account, AssetClass, RebalanceResult } from '../engine/types'
 import { CLASS_COLORS } from './colors'
 import { fmtPct, fmtShares, fmtUsd } from './format'
 import { FUND_PLAIN_NAMES, tidyDescription } from './fundNames'
+import { useBodyScrollLock, useSheetDrag } from './sheetDrag'
+import { useMediaQuery } from './useMediaQuery'
+
+/** Matches the `max-width: 980px` rule where the panel becomes a bottom sheet. */
+const SHEET_QUERY = '(max-width: 980px)'
 
 /** Since-purchase gain/loss, straight from the CSV — display only. */
 function GainSentence({ dollar, percent }: { dollar: number; percent?: number }) {
@@ -30,6 +36,12 @@ export function TransactionsPanel({
   result,
   onClose,
 }: TransactionsPanelProps) {
+  const sheetRef = useRef<HTMLElement>(null)
+  const dragZoneRef = useRef<HTMLElement>(null)
+  const isSheet = useMediaQuery(SHEET_QUERY)
+  useSheetDrag(sheetRef, dragZoneRef, onClose, isSheet)
+  useBodyScrollLock(isSheet)
+
   const color = CLASS_COLORS[assetClass]
   const holdings = account.positions.filter((p) => classOf(p.symbol) === assetClass)
   const classValue = holdings.reduce((sum, p) => sum + p.value, 0)
@@ -63,81 +75,152 @@ export function TransactionsPanel({
   }
 
   return (
-    <aside
-      className="detail-panel"
-      style={{ '--accent': color } as React.CSSProperties}
-      aria-label={`${CLASS_LABELS[assetClass]} in ${account.name}`}
-    >
-      <header className="detail-head">
-        <div>
-          <p className="detail-eyebrow">{account.name}</p>
-          <h2 className="detail-title">{CLASS_LABELS[assetClass]}</h2>
-        </div>
-        <button type="button" className="icon-button" onClick={onClose} aria-label="Close details">
-          ✕
-        </button>
-      </header>
+    <>
+      {isSheet && <div className="sheet-backdrop" onClick={onClose} aria-hidden="true" />}
+      <aside
+        ref={sheetRef}
+        className="detail-panel"
+        style={{ '--accent': color } as React.CSSProperties}
+        aria-label={`${CLASS_LABELS[assetClass]} in ${account.name}`}
+      >
+        <header className="detail-head" ref={dragZoneRef}>
+          <div>
+            <p className="detail-eyebrow">{account.name}</p>
+            <h2 className="detail-title">{CLASS_LABELS[assetClass]}</h2>
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close details">
+            ✕
+          </button>
+        </header>
 
-      <section className="detail-section" aria-label="Rebalance in this account">
-        <h3 className="detail-subhead">Rebalance in this account</h3>
-        {classRow === null ? (
-          <p className="detail-note">
-            Finish the targets (whole numbers totalling 100) to see the plan.
-          </p>
-        ) : plan?.isFrozen ? (
-          <p className="detail-note">Left as-is — this account is too small to trade.</p>
-        ) : (
-          <>
-            <p className="fund-journey">
-              <span>
-                <span className="journey-label">current</span> {fmtUsd(classValue)}
-              </span>
-              <span className="journey-arrow" aria-hidden="true">→</span>
-              {Math.abs(classRow.gap) < 0.005 ? (
-                <span className="delta-chip delta-none">no change</span>
-              ) : isCash ? (
-                cashChip(classRow.gap)
-              ) : (
-                <span
-                  className={`trade-chip ${classRow.gap > 0 ? 'chip-buy' : 'chip-sell'}`}
-                >
-                  {classRow.gap > 0 ? 'BUY +' : 'SELL −'}
-                  {fmtUsd(Math.abs(classRow.gap))}
+        <section className="detail-section" aria-label="Rebalance in this account">
+          <h3 className="detail-subhead">Rebalance in this account</h3>
+          {classRow === null ? (
+            <p className="detail-note">
+              Finish the targets (whole numbers totalling 100) to see the plan.
+            </p>
+          ) : plan?.isFrozen ? (
+            <p className="detail-note">Left as-is — this account is too small to trade.</p>
+          ) : (
+            <>
+              <p className="fund-journey">
+                <span>
+                  <span className="journey-label">current</span> {fmtUsd(classValue)}
                 </span>
-              )}
-              <span className="journey-arrow" aria-hidden="true">→</span>
-              <span className="journey-after">{fmtUsd(classRow.target)}</span>
-            </p>
-            <p className="fund-shares">
-              {fmtPct(shareOfAccount)} of this account now →{' '}
-              {fmtPct(account.total > 0 ? (classRow.target / account.total) * 100 : 0)}{' '}
-              at target
-            </p>
-          </>
-        )}
-      </section>
+                <span className="journey-step">
+                  <span className="journey-arrow" aria-hidden="true">→</span>
+                  {Math.abs(classRow.gap) < 0.005 ? (
+                    <span className="delta-chip delta-none">no change</span>
+                  ) : isCash ? (
+                    cashChip(classRow.gap)
+                  ) : (
+                    <span
+                      className={`trade-chip ${classRow.gap > 0 ? 'chip-buy' : 'chip-sell'}`}
+                    >
+                      {classRow.gap > 0 ? 'BUY +' : 'SELL −'}
+                      {fmtUsd(Math.abs(classRow.gap))}
+                    </span>
+                  )}
+                </span>
+                <span className="journey-step">
+                  <span className="journey-arrow" aria-hidden="true">→</span>
+                  <span className="journey-after">{fmtUsd(classRow.target)}</span>
+                </span>
+              </p>
+              <p className="fund-shares">
+                {fmtPct(shareOfAccount)} of this account now →{' '}
+                {fmtPct(account.total > 0 ? (classRow.target / account.total) * 100 : 0)}{' '}
+                at target
+              </p>
+            </>
+          )}
+        </section>
 
-      <section className="detail-section" aria-label="Holdings and planned trades">
-        <h3 className="detail-subhead">Holdings & plan</h3>
-        <ul className="holding-list">
-          {holdings.map((holding, index) => {
-            const trade = tradeBySymbol.get(holding.symbol) ?? null
-            // Cash rows carry their share of the account's automatic cash change.
-            const rowCashDelta =
-              isCash && classRow !== null && classValue > 0
-                ? cashDelta * (holding.value / classValue)
-                : 0
-            const signed =
-              trade !== null
-                ? trade.action === 'BUY'
-                  ? trade.amount
-                  : -trade.amount
-                : rowCashDelta
-            return (
+        <section className="detail-section" aria-label="Holdings and planned trades">
+          <h3 className="detail-subhead">Holdings & plan</h3>
+          <ul className="holding-list">
+            {holdings.map((holding, index) => {
+              const trade = tradeBySymbol.get(holding.symbol) ?? null
+              // Cash rows carry their share of the account's automatic cash change.
+              const rowCashDelta =
+                isCash && classRow !== null && classValue > 0
+                  ? cashDelta * (holding.value / classValue)
+                  : 0
+              const signed =
+                trade !== null
+                  ? trade.action === 'BUY'
+                    ? trade.amount
+                    : -trade.amount
+                  : rowCashDelta
+              return (
+                <li
+                  key={`${holding.symbol}-${index}`}
+                  className="fund-row panel-fund-row"
+                  style={{ '--i': index } as React.CSSProperties}
+                >
+                  <div className="fund-head">
+                    <span
+                      className="fund-dot"
+                      style={{ background: color, color }}
+                      aria-hidden="true"
+                    />
+                    <span className="fund-name">{holding.symbol}</span>
+                    <span className="fund-ticker">{fmtUsd(holding.price)} / share</span>
+                  </div>
+                  <p className="fund-desc" title={holding.description}>
+                    {FUND_PLAIN_NAMES[holding.symbol] ?? tidyDescription(holding.description)}
+                  </p>
+                  <p className="fund-journey">
+                    <span>
+                      <span className="journey-label">current</span>{' '}
+                      {fmtUsd(holding.value)}
+                    </span>
+                    <span className="journey-step">
+                      <span className="journey-arrow" aria-hidden="true">→</span>
+                      {trade === null ? (
+                        Math.abs(rowCashDelta) >= 0.005 ? (
+                          cashChip(rowCashDelta)
+                        ) : (
+                          <span className="delta-chip delta-none">
+                            {classRow === null ? '—' : 'no change'}
+                          </span>
+                        )
+                      ) : (
+                        <span
+                          className={`trade-chip ${trade.action === 'BUY' ? 'chip-buy' : 'chip-sell'}`}
+                        >
+                          {trade.action === 'BUY' ? 'BUY +' : 'SELL −'}
+                          {fmtUsd(trade.amount)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="journey-step">
+                      <span className="journey-arrow" aria-hidden="true">→</span>
+                      <span className="journey-after">
+                        {fmtUsd(holding.value + signed)}
+                      </span>
+                    </span>
+                  </p>
+                  {trade !== null && (
+                    <p className="fund-shares">
+                      {trade.action === 'BUY' ? 'buys' : 'sells'}{' '}
+                      {fmtShares(trade.shares)} shares
+                    </p>
+                  )}
+                  {holding.gainDollar !== undefined && (
+                    <GainSentence
+                      dollar={holding.gainDollar}
+                      percent={holding.gainPercent}
+                    />
+                  )}
+                </li>
+              )
+            })}
+            {newBuys.map((trade, index) => (
               <li
-                key={`${holding.symbol}-${index}`}
+                key={`new-${trade.symbol}-${index}`}
                 className="fund-row panel-fund-row"
-                style={{ '--i': index } as React.CSSProperties}
+                style={{ '--i': holdings.length + index } as React.CSSProperties}
               >
                 <div className="fund-head">
                   <span
@@ -145,91 +228,36 @@ export function TransactionsPanel({
                     style={{ background: color, color }}
                     aria-hidden="true"
                   />
-                  <span className="fund-name">{holding.symbol}</span>
-                  <span className="fund-ticker">{fmtUsd(holding.price)} / share</span>
+                  <span className="fund-name">{trade.symbol}</span>
+                  <span className="fund-ticker">new position</span>
                 </div>
-                <p className="fund-desc" title={holding.description}>
-                  {FUND_PLAIN_NAMES[holding.symbol] ?? tidyDescription(holding.description)}
-                </p>
+                {FUND_PLAIN_NAMES[trade.symbol] !== undefined && (
+                  <p className="fund-desc">{FUND_PLAIN_NAMES[trade.symbol]}</p>
+                )}
                 <p className="fund-journey">
-                  <span>
-                    <span className="journey-label">current</span>{' '}
-                    {fmtUsd(holding.value)}
-                  </span>
-                  <span className="journey-arrow" aria-hidden="true">→</span>
-                  {trade === null ? (
-                    Math.abs(rowCashDelta) >= 0.005 ? (
-                      cashChip(rowCashDelta)
-                    ) : (
-                      <span className="delta-chip delta-none">
-                        {classRow === null ? '—' : 'no change'}
-                      </span>
-                    )
-                  ) : (
-                    <span
-                      className={`trade-chip ${trade.action === 'BUY' ? 'chip-buy' : 'chip-sell'}`}
-                    >
-                      {trade.action === 'BUY' ? 'BUY +' : 'SELL −'}
-                      {fmtUsd(trade.amount)}
+                  <span>new</span>
+                  <span className="journey-step">
+                    <span className="journey-arrow" aria-hidden="true">→</span>
+                    <span className="trade-chip chip-buy">
+                      BUY +{fmtUsd(trade.amount)}
                     </span>
-                  )}
-                  <span className="journey-arrow" aria-hidden="true">→</span>
-                  <span className="journey-after">
-                    {fmtUsd(holding.value + signed)}
+                  </span>
+                  <span className="journey-step">
+                    <span className="journey-arrow" aria-hidden="true">→</span>
+                    <span className="journey-after">{fmtUsd(trade.amount)}</span>
                   </span>
                 </p>
-                {trade !== null && (
-                  <p className="fund-shares">
-                    {trade.action === 'BUY' ? 'buys' : 'sells'}{' '}
-                    {fmtShares(trade.shares)} shares
-                  </p>
-                )}
-                {holding.gainDollar !== undefined && (
-                  <GainSentence
-                    dollar={holding.gainDollar}
-                    percent={holding.gainPercent}
-                  />
-                )}
+                <p className="fund-shares">
+                  buys {fmtShares(trade.shares)} shares at {fmtUsd(trade.price)} each
+                </p>
               </li>
-            )
-          })}
-          {newBuys.map((trade, index) => (
-            <li
-              key={`new-${trade.symbol}-${index}`}
-              className="fund-row panel-fund-row"
-              style={{ '--i': holdings.length + index } as React.CSSProperties}
-            >
-              <div className="fund-head">
-                <span
-                  className="fund-dot"
-                  style={{ background: color, color }}
-                  aria-hidden="true"
-                />
-                <span className="fund-name">{trade.symbol}</span>
-                <span className="fund-ticker">new position</span>
-              </div>
-              {FUND_PLAIN_NAMES[trade.symbol] !== undefined && (
-                <p className="fund-desc">{FUND_PLAIN_NAMES[trade.symbol]}</p>
-              )}
-              <p className="fund-journey">
-                <span>new</span>
-                <span className="journey-arrow" aria-hidden="true">→</span>
-                <span className="trade-chip chip-buy">
-                  BUY +{fmtUsd(trade.amount)}
-                </span>
-                <span className="journey-arrow" aria-hidden="true">→</span>
-                <span className="journey-after">{fmtUsd(trade.amount)}</span>
-              </p>
-              <p className="fund-shares">
-                buys {fmtShares(trade.shares)} shares at {fmtUsd(trade.price)} each
-              </p>
-            </li>
-          ))}
-          {holdings.length === 0 && newBuys.length === 0 && (
-            <li className="holding-empty">Nothing here — and the plan needs nothing here.</li>
-          )}
-        </ul>
-      </section>
-    </aside>
+            ))}
+            {holdings.length === 0 && newBuys.length === 0 && (
+              <li className="holding-empty">Nothing here — and the plan needs nothing here.</li>
+            )}
+          </ul>
+        </section>
+      </aside>
+    </>
   )
 }
