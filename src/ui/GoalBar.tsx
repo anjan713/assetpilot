@@ -88,7 +88,7 @@ export function GoalBar({ aiContext, onApplyPercents }: GoalBarProps) {
   }
 
   return (
-    <div className="goal-dock">
+    <div className="goal-dock" data-tour="target">
       {status.kind === 'done' && (
         <p className="goal-summary" aria-live="polite">
           {status.summary}

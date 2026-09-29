@@ -303,6 +303,7 @@ export function AtomView({
             <circle
               r={ATOM_CORE_R}
               fill={isOpen ? 'url(#atom-core-gold)' : 'url(#atom-core-idle)'}
+              data-tour="household"
             />
           </g>
         </svg>

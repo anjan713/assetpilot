@@ -30,7 +30,7 @@ export function TargetLegend({
   const isValidSum = sum !== null && Math.abs(sum - 100) <= SUM_EPSILON
 
   return (
-    <section className="target-legend" aria-label="Target allocation">
+    <section className="target-legend" aria-label="Target allocation" data-tour="target">
       <h2 className="legend-title">Targets</h2>
       <div className="legend-rows">
         {ASSET_CLASSES.map((assetClass) => (
